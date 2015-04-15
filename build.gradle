@@ -1,0 +1,20 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'io.ratpack:ratpack-gradle:0.9.15'
+    }
+}
+
+apply plugin: "io.ratpack.ratpack-groovy"
+
+repositories {
+  jcenter()
+}
+
+dependencies {
+}
+
+//some CI config
+apply from: "gradle/ci.gradle"
