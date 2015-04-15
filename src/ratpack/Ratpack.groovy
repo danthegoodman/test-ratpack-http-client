@@ -1,6 +1,9 @@
+import ratpack.exec.Execution
+import ratpack.func.Action
 import ratpack.groovy.Groovy
 import ratpack.http.client.HttpClient
 
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 Groovy.ratpack {
@@ -14,18 +17,30 @@ Groovy.ratpack {
 
             def http = get(HttpClient)
             def n = request.queryParams['times'] as Integer ?: 5
-            def counter = new AtomicInteger(n)
-
             println "/hello: Making ${n} requests"
+
             promise { fulfiller ->
-                for(def i = 0; i < n; i++){
-                    http.get(new URI("http://localhost:5051/block"))
-                        .onError({ fulfiller.error(it)})
-                        .then {
-                            if(counter.decrementAndGet() <= 0){
-                                fulfiller.success(null)
-                            }
-                        }
+                def counter = new AtomicInteger(n)
+                Action<Execution> onComplete = { e ->
+                    if (counter.decrementAndGet() == 0) {
+                        fulfiller.success(null);
+                    }
+                };
+
+                def error = new AtomicBoolean();
+                Action<Throwable> onError = { t ->
+                    if (error.compareAndSet(false, true)) {
+                        fulfiller.error(t);
+                    }
+                };
+
+                for(def i = 0; i < n; i++) {
+                    context.exec()
+                            .onError(onError)
+                            .onComplete(onComplete)
+                            .start({
+                                http.get(new URI("http://localhost:5051/block")).then{}
+                             })
                 }
             }.then {
                 def msg = "made ${n} requests in ${System.currentTimeMillis() - start} ms"
